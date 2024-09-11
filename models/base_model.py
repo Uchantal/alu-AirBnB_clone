@@ -63,7 +63,7 @@ if __name__ == "__main__":
     print(my_model_json)
     print("JSON of my_model:")
     for key in my_model_json.keys():
-      print(
+        print(
           "\t{}: ({}) - {}".format(
               key,
               type(my_model_json[key]),
