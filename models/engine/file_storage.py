@@ -1,132 +1,90 @@
-#!/usr/bin/python3
-"""
-This File defines the storage system (File System)
-For the project.
-It uses json format to serialize or deserialize
-an object"""
+#!/usr/bin/env python
+"""A module that that serializes instances to a JSON file and deserializes
+JSON file to instances"""
 
 import json
-from json.decoder import JSONDecodeError
-from .errors import *
+import os
 from models.base_model import BaseModel
 from models.user import User
-from models.state import State
-from models.city import City
 from models.amenity import Amenity
+from models.city import City
 from models.place import Place
 from models.review import Review
-from datetime import datetime
+from models.state import State
 
 
 class FileStorage:
-    """This class serve as an ORM to interface between or Storage System"""
 
-    # class private variables
+    # private class attributes
+    # __file_path is the path to the JSON file to store all objects.
+    __file_path = 'storage.json'
+
+    # __objects is a dictionary that stores all objects by <class name>.id
+    # ex: to store a BaseModel object with id=12121212, the key will be
+    # BaseModel.12121212 and the value will be the object.
+    # the object (value of key) is stored like this:
+    # <models.base_model.BaseModel object at 0x7f3329dac310>
+    # obects = {BaseModel.12121212: }
     __objects = {}
-    __file_path = "file.json"
-    models = (
-        "BaseModel",
-        "User", "City", "State", "Place",
-        "Amenity", "Review"
-    )
 
-    def __init__(self):
-        """constructor"""
-        pass
+    def all(self, cls=None):
+        """Returns a list of all objects if cls is None. If cls is provided, return all objects of that type.
+        """
 
-    def all(self):
-        """Return all instances stored"""
-        return FileStorage.__objects
+        if cls is not None:
 
+            obj = {}
+            print(FileStorage.__objects.items())
+            for key, val in FileStorage.__objects.items():
+                if cls.__name__ in key:
+                    obj[key] = val
+            return obj
+        else:
+            return self.__objects
+
+    # sets in __objects the obj with key <obj class name>.id
     def new(self, obj):
-        """Stores a new Object"""
-        key = "{}.{}".format(type(obj).__name__, obj.id)
-        FileStorage.__objects[key] = obj
+        """Add obj with key <obj class name>.id to dictionary.
 
+        Args:
+
+        obj: the object with key <obj class name>.id
+        """
+        key = obj.__class__.__name__ + '.' + obj.id
+        # json_data = json.dump(obj)
+        self.__objects[key] = obj
+
+    # serializes __objects to the JSON file (path: __file_path)
     def save(self):
-        """serializes objects stored and persist in file"""
-        serialized = {
-            key: val.to_dict()
-            for key, val in self.__objects.items()
-        }
-        with open(FileStorage.__file_path, "w") as f:
-            f.write(json.dumps(serialized))
+        """ Serializes __objects to the JSON file (path: __file_path)."""
+        json_obj = {}
+        for key in self.__objects.keys():
+            json_obj[key] = self.__objects[key].to_dict()
+
+        with open(self.__file_path, 'w') as json_file:
+            json.dump(json_obj, json_file)
 
     def reload(self):
-        """de-serialize persisted objects"""
-        try:
-            deserialized = {}
-            with open(FileStorage.__file_path, "r") as f:
-                deserialized = json.loads(f.read())
-            FileStorage.__objects = {
-                key:
-                    eval(obj["__class__"])(**obj)
-                    for key, obj in deserialized.items()}
-        except (FileNotFoundError, JSONDecodeError):
-            # No need for error
-            pass
+        """Deserializes the JSON file to __objects (only if the JSON file"""
+        """(path: __file_path) exists ; otherwise, do nothing."""
+        if os.path.exists(self.__file_path):
+            with open(self.__file_path, 'r') as json_file:
+                json_obj = json.load(json_file)
+                for key in json_obj.keys():
 
-    def find_by_id(self, model, obj_id):
-        """Find and return an elemt of model by its id"""
-        F = FileStorage
-        if model not in F.models:
-            # Invalid Model Name
-            # Not yet Implemented
-            raise ModelNotFoundError(model)
+                    # By providing the dict value stored in json_obj[key] as
+                    # kwargs, genrate an object with the same attributes
+                    self.__objects[key] = eval(
+                        json_obj[key]['__class__'])(**json_obj[key])
 
-        key = model + "." + obj_id
-        if key not in F.__objects:
-            # invalid id
-            # Not yet Implemented
-            raise InstanceNotFoundError(obj_id, model)
-
-        return F.__objects[key]
-
-    def delete_by_id(self, model, obj_id):
-        """Find and return an elemt of model by its id"""
-        F = FileStorage
-        if model not in F.models:
-            raise ModelNotFoundError(model)
-
-        key = model + "." + obj_id
-        if key not in F.__objects:
-            raise InstanceNotFoundError(obj_id, model)
-
-        del F.__objects[key]
-        self.save()
-
-    def find_all(self, model=""):
-        """Find all instances or instances of model"""
-        if model and model not in FileStorage.models:
-            raise ModelNotFoundError(model)
-        results = []
-        for key, val in FileStorage.__objects.items():
-            if key.startswith(model):
-                results.append(str(val))
-        return results
-
-    def update_one(self, model, iid, field, value):
-        """Updates an instance"""
-        F = FileStorage
-        if model not in F.models:
-            raise ModelNotFoundError(model)
-
-        key = model + "." + iid
-        if key not in F.__objects:
-            raise InstanceNotFoundError(iid, model)
-        if field in ("id", "updated_at", "created_at"):
-            # not allowed to be updated
-            return
-        inst = F.__objects[key]
-        try:
-            # if instance has that value
-            # cast it to its type
-            vtype = type(inst.__dict__[field])
-            inst.__dict__[field] = vtype(value)
-        except KeyError:
-            # instance doesn't has the field
-            # assign the value with its type
-            inst.__dict__[field] = value
-        finally:
-            inst.updated_at = datetime.utcnow()
-            self.save()
+    def delete(self, obj=None):
+        """Delete an object from the __objects"""
+        if obj is not None:
+            for key, val in list(FileStorage.__objects.items()):
+                if obj == val:
+                    del FileStorage.__objects[key]
+                    print("Deleted: {}".format(key))
+                    self.save()
+                    
+    def close(self):
+        self.reload()
