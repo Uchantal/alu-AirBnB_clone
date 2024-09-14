@@ -68,8 +68,7 @@ if __name__ == "__main__":
               key,
               type(my_model_json[key]),
               my_model_json[key]
-          )
-      )
+          ))
     print("--")
     my_new_model = BaseModel(**my_model_json)
     print(my_new_model.id)
